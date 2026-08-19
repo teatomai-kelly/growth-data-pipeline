@@ -24,6 +24,12 @@ ALLOWED_METRICS = {
 }
 ALLOWED_GROUPS = {"acquisition_channel", "signup_month", "overall"}
 ALLOWED_CHANNELS = {"all", "organic", "paid_search", "paid_social", "referral"}
+ALLOWED_GROUPS_BY_METRIC = {
+    "revenue_by_channel": {"acquisition_channel", "overall"},
+    "customers_by_channel": {"acquisition_channel", "overall"},
+    "activation_rate": {"acquisition_channel", "overall"},
+    "repeat_purchase_rate": {"signup_month", "overall"},
+}
 
 
 @dataclass(frozen=True)
@@ -55,10 +61,23 @@ SYSTEM_INSTRUCTIONS = """You are a growth analytics intent classifier.
 Map a user's question to exactly one approved metric, grouping, and optional acquisition-channel filter.
 Never invent metrics, tables, SQL, filters, or fields.
 Approved metrics: revenue_by_channel, customers_by_channel, activation_rate, repeat_purchase_rate.
-Approved groupings: acquisition_channel, signup_month, overall.
+Valid groupings by metric:
+- revenue_by_channel: acquisition_channel or overall
+- customers_by_channel: acquisition_channel or overall
+- activation_rate: acquisition_channel or overall
+- repeat_purchase_rate: signup_month or overall
 Approved channels: all, organic, paid_search, paid_social, referral.
 Use channel='all' when the user did not request a specific acquisition channel.
 """
+
+
+def _validate_intent(intent: AnalyticsIntent) -> None:
+    if intent.metric not in ALLOWED_METRICS:
+        raise ValueError("Unsupported analytics metric.")
+    if intent.group_by not in ALLOWED_GROUPS_BY_METRIC[intent.metric]:
+        raise ValueError("Unsupported grouping for the selected metric.")
+    if intent.channel not in ALLOWED_CHANNELS:
+        raise ValueError("Unsupported acquisition channel.")
 
 
 def classify_question(question: str) -> AnalyticsIntent:
@@ -84,12 +103,7 @@ def classify_question(question: str) -> AnalyticsIntent:
         group_by=payload["group_by"],
         channel=payload["channel"],
     )
-    if (
-        intent.metric not in ALLOWED_METRICS
-        or intent.group_by not in ALLOWED_GROUPS
-        or intent.channel not in ALLOWED_CHANNELS
-    ):
-        raise ValueError("Model returned an unsupported analytics intent.")
+    _validate_intent(intent)
     return intent
 
 
@@ -106,6 +120,7 @@ def execute_intent(
     events: pd.DataFrame,
 ) -> pd.DataFrame:
     """Execute an approved intent against trusted data."""
+    _validate_intent(intent)
     customers = _filter_channel(customers, intent.channel)
     customer_ids = set(customers["customer_id"])
     orders = orders.loc[orders["customer_id"].isin(customer_ids)].copy()
@@ -115,9 +130,10 @@ def execute_intent(
         from src.models.growth import build_channel_performance
         result = build_channel_performance(customers, orders)
         if intent.group_by == "overall":
+            customer_count = result["customers"].sum()
             return pd.DataFrame([{
                 "revenue": result["revenue"].sum(),
-                "revenue_per_customer": result["revenue"].sum() / result["customers"].sum(),
+                "revenue_per_customer": result["revenue"].sum() / customer_count if customer_count else None,
             }])
         return result[["acquisition_channel", "revenue", "revenue_per_customer"]]
 
@@ -142,10 +158,11 @@ def execute_intent(
         result = pd.concat([signups, activations], axis=1).fillna(0).reset_index()
         result["activation_rate"] = result["activations"].div(result["signups"].replace(0, pd.NA))
         if intent.group_by == "overall":
+            signups_total = result["signups"].sum()
             return pd.DataFrame([{
-                "signups": result["signups"].sum(),
+                "signups": signups_total,
                 "activations": result["activations"].sum(),
-                "activation_rate": result["activations"].sum() / result["signups"].sum(),
+                "activation_rate": result["activations"].sum() / signups_total if signups_total else None,
             }])
         return result
 
