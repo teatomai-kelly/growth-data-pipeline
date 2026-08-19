@@ -1,34 +1,42 @@
 # Growth Data Pipeline
 
-An end-to-end analytics engineering project demonstrating data ingestion, transformation, dimensional modeling, data quality checks, and analytics-ready growth metrics.
+An end-to-end data engineering portfolio project demonstrating ingestion, source validation, business transformations, dimensional modeling, incremental processing, data quality controls, automated testing, and analytics-ready growth metrics.
 
 ## Business problem
 
-A subscription business needs a reliable view of customer acquisition, activation, retention, revenue, and marketing performance. Source systems contain customer, order, and marketing-event data that must be standardized before analysts can use it confidently.
+A subscription business needs a reliable view of customer acquisition, activation, revenue, and retention. Source systems contain customer, order, and marketing-event data that must be standardized and transformed before analysts and business stakeholders can use it confidently.
 
-## Pipeline
+The project treats the modeled tables as a reusable data layer so downstream reporting does not have to repeatedly rebuild business logic from raw sources.
+
+## Architecture
 
 ```text
-Raw CSV sources
-    |
-    v
-Ingestion / validation
-    |
-    v
-Staging models
-    |
-    v
+Synthetic source data
+        |
+        v
+  Ingestion + schema validation
+        |
+        v
+      Staging
+        |
+        v
 Business transformations
-    |
-    +--> Customer dimension
-    +--> Order fact
-    +--> Daily growth metrics
-    |
-    v
-Data quality checks
-    |
-    v
-Analytics-ready outputs
+        |
+   +----+---------+----------------+
+   |              |                |
+   v              v                v
+Dim customer   Fact order     Fact marketing event
+   |              |                |
+   +--------------+----------------+
+                  |
+                  v
+         Daily growth metrics
+                  |
+                  v
+        Data quality + tests
+                  |
+                  v
+          Analytics-ready data
 ```
 
 ## Tech stack
@@ -37,26 +45,43 @@ Analytics-ready outputs
 - pandas
 - SQL
 - pytest
-- Git/GitHub
-- Dimensional modeling concepts
+- GitHub Actions
+- Dimensional modeling
+- Watermark-based incremental processing
+
+The implementation is intentionally lightweight so the engineering patterns remain easy to inspect. The same patterns can be transferred to distributed platforms such as Databricks/Spark.
 
 ## Repository structure
 
 ```text
 growth-data-pipeline/
+├── .github/workflows/ci.yml
 ├── data/
 │   ├── raw/
+│   │   ├── customers.csv
+│   │   ├── orders.csv
+│   │   └── marketing_events.csv
 │   └── processed/
 ├── docs/
 │   └── data_model.md
 ├── sql/
 │   ├── staging/
 │   └── marts/
+│       └── daily_growth_metrics.sql
 ├── src/
 │   ├── ingestion/
+│   │   ├── incremental.py
+│   │   └── load_sources.py
 │   ├── models/
+│   │   ├── customer.py
+│   │   ├── marketing_event.py
+│   │   └── order.py
 │   ├── quality/
-│   └── transformations/
+│   │   └── checks.py
+│   ├── transformations/
+│   │   ├── growth_metrics.py
+│   │   └── staging.py
+│   └── run_pipeline.py
 ├── tests/
 ├── .gitignore
 └── requirements.txt
@@ -68,21 +93,58 @@ growth-data-pipeline/
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pytest
+pytest -q
+python -m src.run_pipeline
 ```
 
-The project intentionally uses synthetic data so the repository is safe to publish publicly.
+The pipeline writes modeled outputs to `data/processed/`.
+
+## Engineering practices demonstrated
+
+### Data ingestion and validation
+
+Source files are loaded through a common ingestion layer that checks required columns before transformations begin.
+
+### Business-ready data modeling
+
+The project separates source cleanup from business logic and defines explicit grains for dimensions and facts:
+
+- `dim_customer`: one row per customer
+- `fct_order`: one row per order
+- `fct_marketing_event`: one row per marketing event
+- `mart_daily_growth`: one row per calendar date
+
+### Data quality
+
+Reusable checks cover required fields, uniqueness of keys, non-negative numeric measures, and referential consistency between marketing events and customers.
+
+### Incremental processing
+
+A reusable watermark utility demonstrates how a pipeline can process only records newer than the last successful processing boundary while retaining a full-load path for initial ingestion.
+
+### Automated testing
+
+Pytest validates model grains, revenue business logic, referential integrity, and incremental filtering. GitHub Actions runs the test suite on pushes and pull requests to `main`.
 
 ## Key metrics
 
 - New customers
 - Activation rate
-- Orders
+- Completed orders
 - Gross revenue
 - Average order value
-- Repeat-purchase rate
 - Revenue by acquisition channel
+- Repeat-purchase rate
+
+## Assumptions and business logic
+
+- Only `completed` orders contribute to recognized revenue.
+- Cancelled and refunded orders remain available for operational analysis but contribute zero recognized revenue in the growth mart.
+- Activation rate is calculated as activated customers divided by new customers for the same date; division by zero returns null.
+- Modeled tables preserve source identifiers so records can be traced back to their originating dataset.
 
 ## Portfolio focus
 
-This project is designed to show practical data-engineering and analytics-engineering skills: reusable transformations, explicit business logic, validation, test coverage, documented models, and a clear path from source data to stakeholder-facing metrics.
+This project is designed to demonstrate practical data-engineering and analytics-engineering skills: translating business requirements into reusable data structures, defining explicit business logic, building quality controls, documenting data models, and delivering trusted datasets for downstream analysis.
+
+All source data is synthetic and contains no employer or proprietary information.
