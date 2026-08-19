@@ -30,13 +30,17 @@ Dim customer   Fact order     Fact marketing event
    +--------------+----------------+
                   |
                   v
-         Daily growth metrics
+       Growth metrics + marts
                   |
                   v
         Data quality + tests
                   |
                   v
           Analytics-ready data
+                  |
+                  v
+     Natural-language analytics
+             assistant
 ```
 
 ## Tech stack
@@ -48,6 +52,7 @@ Dim customer   Fact order     Fact marketing event
 - GitHub Actions
 - Dimensional modeling
 - Watermark-based incremental processing
+- OpenAI Responses API (optional AI layer)
 
 The implementation is intentionally lightweight so the engineering patterns remain easy to inspect. The same patterns can be transferred to distributed platforms such as Databricks/Spark.
 
@@ -69,11 +74,14 @@ growth-data-pipeline/
 │   └── marts/
 │       └── daily_growth_metrics.sql
 ├── src/
+│   ├── ai/
+│   │   └── data_assistant.py
 │   ├── ingestion/
 │   │   ├── incremental.py
 │   │   └── load_sources.py
 │   ├── models/
 │   │   ├── customer.py
+│   │   ├── growth.py
 │   │   ├── marketing_event.py
 │   │   └── order.py
 │   ├── quality/
@@ -98,6 +106,27 @@ python -m src.run_pipeline
 ```
 
 The pipeline writes modeled outputs to `data/processed/`.
+
+## Natural-language analytics assistant
+
+The project includes an optional AI layer for business questions. The assistant uses an LLM to classify a natural-language question into a **constrained analytics intent**, then executes that intent with deterministic Python logic against trusted modeled data.
+
+Example questions:
+
+- "Which acquisition channel generated the most revenue?"
+- "How many customers came from referrals?"
+- "What is the activation rate by acquisition channel?"
+- "What is the repeat-purchase rate by signup month?"
+
+The model is **not** allowed to generate arbitrary SQL or execute arbitrary code. Its output is restricted to an approved metric/grouping schema, and the application performs the actual calculation. This separation keeps the AI layer flexible while preserving control over business logic and data access.
+
+To enable the assistant, set an API key in the environment:
+
+```bash
+export OPENAI_API_KEY="your_api_key_here"
+```
+
+The implementation uses the OpenAI Responses API and structured output to produce the constrained intent. The API key is never stored in the repository. OpenAI's current developer documentation recommends environment-based API-key configuration and the Responses API for model requests and tool/agent workflows. citeturn1search0turn1search5
 
 ## Engineering practices demonstrated
 
@@ -124,7 +153,11 @@ A reusable watermark utility demonstrates how a pipeline can process only record
 
 ### Automated testing
 
-Pytest validates model grains, revenue business logic, referential integrity, and incremental filtering. GitHub Actions runs the test suite on pushes and pull requests to `main`.
+Pytest validates model grains, revenue business logic, referential integrity, growth metrics, and incremental filtering. GitHub Actions runs the test suite on pushes and pull requests to `main`.
+
+### Stakeholder-oriented analytics
+
+The growth models turn raw operational records into reusable metrics such as revenue by acquisition channel, activation rate, and repeat-purchase behavior. The explicit metric layer is intended to keep business definitions centralized rather than duplicated across reports.
 
 ## Key metrics
 
@@ -134,6 +167,7 @@ Pytest validates model grains, revenue business logic, referential integrity, an
 - Gross revenue
 - Average order value
 - Revenue by acquisition channel
+- Customer conversion rate
 - Repeat-purchase rate
 
 ## Assumptions and business logic
@@ -145,6 +179,6 @@ Pytest validates model grains, revenue business logic, referential integrity, an
 
 ## Portfolio focus
 
-This project is designed to demonstrate practical data-engineering and analytics-engineering skills: translating business requirements into reusable data structures, defining explicit business logic, building quality controls, documenting data models, and delivering trusted datasets for downstream analysis.
+This project is designed to demonstrate practical data-engineering and analytics-engineering skills: translating business requirements into reusable data structures, defining explicit business logic, building quality controls, documenting data models, delivering trusted datasets for downstream analysis, and creating a controlled natural-language interface for business questions.
 
 All source data is synthetic and contains no employer or proprietary information.
