@@ -126,7 +126,7 @@ To enable the assistant, set an API key in the environment:
 export OPENAI_API_KEY="your_api_key_here"
 ```
 
-The implementation uses the OpenAI Responses API and structured output to produce the constrained intent. The API key is never stored in the repository. OpenAI's current developer documentation recommends environment-based API-key configuration and the Responses API for model requests and tool/agent workflows. citeturn1search0turn1search5
+The implementation uses the OpenAI Responses API and structured output to produce the constrained intent. The API key is never stored in the repository.
 
 ## Engineering practices demonstrated
 
