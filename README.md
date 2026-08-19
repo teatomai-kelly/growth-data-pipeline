@@ -76,6 +76,7 @@ growth-data-pipeline/
 ├── src/
 │   ├── ai/
 │   │   └── data_assistant.py
+│   ├── ask_data.py
 │   ├── ingestion/
 │   │   ├── incremental.py
 │   │   └── load_sources.py
@@ -118,12 +119,18 @@ Example questions:
 - "What is the activation rate by acquisition channel?"
 - "What is the repeat-purchase rate by signup month?"
 
-The model is **not** allowed to generate arbitrary SQL or execute arbitrary code. Its output is restricted to an approved metric/grouping schema, and the application performs the actual calculation. This separation keeps the AI layer flexible while preserving control over business logic and data access.
+The model is **not** allowed to generate arbitrary SQL or execute arbitrary code. Its output is restricted to an approved metric/grouping/channel schema, and the application performs the actual calculation. This separation keeps the AI layer flexible while preserving control over business logic and data access.
 
 To enable the assistant, set an API key in the environment:
 
 ```bash
 export OPENAI_API_KEY="your_api_key_here"
+```
+
+Then ask a question from the command line:
+
+```bash
+python -m src.ask_data "Which acquisition channel generated the most revenue?"
 ```
 
 The implementation uses the OpenAI Responses API and structured output to produce the constrained intent. The API key is never stored in the repository.
@@ -153,7 +160,7 @@ A reusable watermark utility demonstrates how a pipeline can process only record
 
 ### Automated testing
 
-Pytest validates model grains, revenue business logic, referential integrity, growth metrics, and incremental filtering. GitHub Actions runs the test suite on pushes and pull requests to `main`.
+Pytest validates model grains, revenue business logic, referential integrity, growth metrics, incremental filtering, and the constrained analytics assistant. GitHub Actions runs the test suite on pushes and pull requests to `main`.
 
 ### Stakeholder-oriented analytics
 
